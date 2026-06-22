@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCUI — Sistema de Comedores Universitarios Inteligente</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --verde:       #1B4D3E;
+      --verde-med:   #2E7D5B;
+      --verde-suave: #DCEFE3;
+      --naranja:     #C2622D;
+      --naranja-s:   #F3DCC9;
+      --crema:       #F7F4EE;
+      --gris:        #3B3B3B;
+      --gris-l:      #F2F2F2;
+      --blanco:      #FFFFFF;
+      --sombra:      0 2px 16px rgba(0,0,0,.08);
+    }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--crema); color: var(--gris); min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0; width: 240px; height: 100vh;
+      background: var(--verde); display: flex; flex-direction: column;
+      padding: 0; overflow-y: auto; z-index: 100;
+    }
+    .logo { padding: 28px 20px 20px; border-bottom: 1px solid #2E7D5B; }
+    .logo-icon { font-size: 28px; margin-bottom: 6px; }
+    .logo h1 { font-size: 14px; color: var(--blanco); font-weight: 700; line-height: 1.3; }
+    .logo p  { font-size: 11px; color: #A9CDBB; margin-top: 4px; }
+    nav { flex: 1; padding: 16px 0; }
+    nav a {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 20px; color: #A9CDBB; text-decoration: none;
+      font-size: 13.5px; transition: background .15s, color .15s; cursor: pointer;
+    }
+    nav a:hover, nav a.active { background: #2E7D5B; color: var(--blanco); }
+    nav a .ico { font-size: 17px; min-width: 22px; text-align: center; }
+    .nav-section { padding: 14px 20px 6px; font-size: 10px; color: #6BA68A; letter-spacing: 1.2px; text-transform: uppercase; }
+    .sidebar-footer { padding: 14px 20px; border-top: 1px solid #2E7D5B; font-size: 11px; color: #6BA68A; }
+
+    /* ── Main ── */
+    .main { margin-left: 240px; padding: 32px; min-height: 100vh; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Header de página ── */
+    .page-header { margin-bottom: 28px; }
+    .page-header h2 { font-size: 22px; color: var(--verde); font-weight: 700; }
+    .page-header p  { font-size: 13.5px; color: #6B7B73; margin-top: 4px; }
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; margin-left: 8px; vertical-align: middle;
+    }
+    .badge-q3 { background: var(--verde-suave); color: var(--verde); }
+    .badge-q2 { background: #D6E4F7; color: #1A3C6E; }
+    .badge-q1 { background: var(--naranja-s); color: var(--naranja); }
+
+    /* ── Cards de stats ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--blanco); border-radius: 12px; padding: 18px 16px;
+      box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 8px;
+    }
+    .stat-card .ico { font-size: 22px; }
+    .stat-card .num { font-size: 30px; font-weight: 700; color: var(--verde); line-height: 1; }
+    .stat-card .lbl { font-size: 11.5px; color: #6B7B73; line-height: 1.4; }
+    .stat-card.total .num { color: var(--naranja); }
+
+    /* ── Panel genérico ── */
+    .panel {
+      background: var(--blanco); border-radius: 14px; padding: 22px 22px 20px;
+      box-shadow: var(--sombra); margin-bottom: 24px;
+    }
+    .panel-title { font-size: 15px; font-weight: 700; color: var(--verde); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .panel-sub   { font-size: 12px; color: #6B7B73; margin-top: -12px; margin-bottom: 16px; }
+
+    /* ── Grid 2 columnas ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Tabla ── */
+    .tabla-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: var(--verde); }
+    thead th { padding: 10px 14px; color: var(--blanco); text-align: left; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    tbody tr:nth-child(even) { background: var(--crema); }
+    tbody tr:hover { background: var(--verde-suave); }
+    tbody td { padding: 9px 14px; border-bottom: 1px solid #EEE; }
+    .chip {
+      display: inline-block; padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .chip-verde  { background: var(--verde-suave); color: var(--verde); }
+    .chip-azul   { background: #D6E4F7; color: #1A3C6E; }
+    .chip-naranja{ background: var(--naranja-s); color: var(--naranja); }
+    .chip-rojo   { background: #FCE4EC; color: #B00020; }
+    .chip-gris   { background: var(--gris-l); color: #555; }
+
+    /* ── Formulario ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--verde); }
+    .form-group input, .form-group select {
+      padding: 9px 12px; border: 1.5px solid #D0DDD7; border-radius: 8px;
+      font-size: 13px; outline: none; transition: border .15s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--verde-med); }
+    .btn {
+      padding: 11px 22px; border: none; border-radius: 8px;
+      font-size: 13.5px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .88; }
+    .btn-primary { background: var(--verde); color: var(--blanco); }
+    .btn-danger  { background: #D32F2F; color: var(--blanco); }
+    .btn-warn    { background: var(--naranja); color: var(--blanco); }
+    .btn-row { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+
+    /* ── Alerta / Toast ── */
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      padding: 13px 20px; border-radius: 10px; font-size: 13.5px;
+      color: var(--blanco); box-shadow: 0 4px 20px rgba(0,0,0,.18);
+      display: none; z-index: 999; max-width: 360px;
+    }
+    #toast.show { display: block; animation: fadeIn .3s; }
+    #toast.ok  { background: var(--verde-med); }
+    #toast.err { background: #D32F2F; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 36px; height: 36px; border: 4px solid var(--verde-suave);
+      border-top-color: var(--verde); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 30px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Barra de progreso (eficiencia) ── */
+    .barra-wrap { display: flex; align-items: center; gap: 10px; }
+    .barra { flex: 1; height: 8px; background: var(--gris-l); border-radius: 4px; overflow: hidden; }
+    .barra-fill { height: 100%; border-radius: 4px; }
+    .barra-val { font-size: 12px; font-weight: 700; min-width: 44px; text-align: right; }
+
+    /* ── Conector info ── */
+    .conn-box {
+      background: var(--verde); border-radius: 10px; padding: 14px 18px;
+      margin-bottom: 20px; font-size: 13px; color: #A9CDBB;
+    }
+    .conn-box span { color: var(--blanco); font-weight: 700; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🍽️</div>
+    <h1>Comedores UCaldas</h1>
+    <p>Sistema Inteligente</p>
+  </div>
+  <nav>
+    <a class="active" onclick="goto('dashboard')"><span class="ico">📊</span> Dashboard</a>
+    <div class="nav-section">Q3 — Operativo</div>
+    <a onclick="goto('menus')">    <span class="ico">🥗</span> Ver Menús</a>
+    <a onclick="goto('estudiantes')"><span class="ico">👩‍🎓</span> Estudiantes</a>
+    <a onclick="goto('reservar')"> <span class="ico">📋</span> Nueva Reserva</a>
+    <a onclick="goto('limpiar')">  <span class="ico">🗑️</span> Limpiar BD</a>
+    <div class="nav-section">Q2 — Analítico</div>
+    <a onclick="goto('desperdicio')"><span class="ico">♻️</span> Desperdicio / Dieta</a>
+    <a onclick="goto('asistencia')"> <span class="ico">📅</span> Asistencia / Sede</a>
+    <a onclick="goto('inasistencias')"><span class="ico">⚠️</span> Top Inasistencias</a>
+    <div class="nav-section">Q1 — Estratégico</div>
+    <a onclick="goto('proyeccion')"> <span class="ico">📈</span> Proyección Demanda</a>
+    <a onclick="goto('financiero')"> <span class="ico">💰</span> Reporte Financiero</a>
+    <a onclick="goto('riesgo')">     <span class="ico">🚨</span> Beneficio en Riesgo</a>
+    <a onclick="goto('eficiencia')"> <span class="ico">🏆</span> Eficiencia de Menús</a>
+  </nav>
+  <div class="sidebar-footer">
+    Universidad de Caldas · 2026-1<br>Docente: Oscar Bedoya
+  </div>
+</aside>
+
+<!-- ========== MAIN ========== -->
+<main class="main">
+
+  <!-- ── DASHBOARD ── -->
+  <div id="page-dashboard" class="page active">
+    <div class="page-header">
+      <h2>📊 Dashboard General</h2>
+      <p>Resumen en tiempo real de la base de datos <code>comedorUCaldas</code></p>
+    </div>
+    <div class="conn-box">
+      Conectado a <span>mongodb://localhost:27017</span> → base de datos <span>comedorUCaldas</span>
+    </div>
+    <div id="stats-grid" class="stats-grid"><div class="spinner"></div></div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">♻️ % Desperdicio por tipo de dieta <span class="badge badge-q2">Q2.1</span></div>
+        <canvas id="chartDesperdicio" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📅 Tasa de asistencia por sede <span class="badge badge-q2">Q2.2</span></div>
+        <canvas id="chartAsistencia" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MENÚS Q3.2 ── -->
+  <div id="page-menus" class="page">
+    <div class="page-header">
+      <h2>🥗 Menús registrados <span class="badge badge-q3">Q3.2 — FIND</span></h2>
+      <p>Últimos 10 menús en la colección <code>menus</code></p>
+    </div>
+    <div class="panel">
+      <div id="tabla-menus"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ── ESTUDIANTES Q3.5 ── -->
+  <div id="page-estudiantes" class="page">
+    <div class="page-header">
+      <h2>👩‍🎓 Estudiantes activos <span class="badge badge-q3">Q3.5 — FIND</span></h2>
+      <p>Beneficiarios activos del programa de alimentación</p>
+    </div>
+    <div class="panel">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:flex-end;">
+        <div class="form-group" style="flex:1">
+          <label>Filtrar por sede</label>
+          <select id="sede-filtro" onchange="cargarEstudiantes()">
+            <option value="">— Todas las sedes —</option>
+            <option>Sede Central</option>
+            <option>Sede Agropecuarias</option>
+            <option>Sede Medicina</option>
+            <option>Sede Derecho</option>
+            <option>Sede Lans</option>
+            <option>Sede Bellas Artes</option>
+            <option>Sede Residencias Masculinas</option>
+            <option>Sede Residencias Femeninas</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="cargarEstudiantes()">Buscar</button>
+      </div>
+      <div id="tabla-estudiantes"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ── NUEVA RESERVA Q3.1 ── -->
+  <div id="page-reservar" class="page">
+    <div class="page-header">
+      <h2>📋 Nueva Reserva <span class="badge badge-q3">Q3.1 — INSERT</span></h2>
+      <p>Registra una reserva anticipada para un estudiante beneficiario</p>
+    </div>
+    <div class="panel" style="max-width:540px">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Código del estudiante *</label>
+          <input type="text" id="res-codigo" placeholder="ej: 2021045" />
+        </div>
+        <div class="form-group">
+          <label>Sede *</label>
+          <select id="res-sede">
+            <option value="">Seleccionar sede…</option>
+            <option>Sede Central</option>
+            <option>Sede Agropecuarias</option>
+            <option>Sede Medicina</option>
+            <option>Sede Derecho</option>
+            <option>Sede Lans</option>
+            <option>Sede Bellas Artes</option>
+            <option>Sede Residencias Masculinas</option>
+            <option>Sede Residencias Femeninas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha del almuerzo *</label>
+          <input type="date" id="res-fecha" />
+        </div>
+        <div class="form-group">
+          <label>Hora preferida</label>
+          <select id="res-hora">
+            <option value="11:30">11:30</option>
+            <option value="12:00" selected>12:00</option>
+            <option value="12:30">12:30</option>
+            <option value="13:00">13:00</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn btn-primary" onclick="crearReserva()">✅ Crear reserva</button>
+      </div>
+      <div id="resultado-reserva" style="margin-top:14px;font-size:13px;"></div>
+    </div>
+  </div>
+
+  <!-- ── LIMPIAR BD Q3.4 ── -->
+  <div id="page-limpiar" class="page">
+    <div class="page-header">
+      <h2>🗑️ Mantenimiento de la BD <span class="badge badge-q3">Q3.4 — DELETE</span></h2>
+      <p>Eliminar registros obsoletos para mantener la base de datos limpia</p>
+    </div>
+    <div class="panel" style="max-width:500px">
+      <p style="font-size:14px;margin-bottom:18px;line-height:1.6;">
+        Esta operación elimina todas las reservas con estado <strong>cancelada</strong>
+        cuya fecha de creación sea mayor a <strong>30 días</strong> atrás.<br>
+        Equivale a ejecutar en mongosh:
+      </p>
+      <pre style="background:#1E1E1E;color:#A8FF60;padding:12px 16px;border-radius:8px;font-size:12.5px;margin-bottom:18px;overflow-x:auto">db.reservas_comida.deleteMany({
+  estado: 'cancelada',
+  fecha_reserva: { $lt: new Date(Date.now() - 30*24*60*60*1000) }
+})</pre>
+      <button class="btn btn-danger" onclick="limpiarCanceladas()">🗑️ Ejecutar limpieza</button>
+      <div id="resultado-limpieza" style="margin-top:14px;font-size:13px;"></div>
+    </div>
+  </div>
+
+  <!-- ── DESPERDICIO Q2.1 ── -->
+  <div id="page-desperdicio" class="page">
+    <div class="page-header">
+      <h2>♻️ % Desperdicio por tipo de dieta <span class="badge badge-q2">Q2.1</span></h2>
+      <p>Agrupación de porciones preparadas vs servidas por cada tipo de dieta</p>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Gráfica</div>
+        <canvas id="chartDesperdicioPage" height="260"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Datos detallados</div>
+        <div id="tabla-desperdicio"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ASISTENCIA Q2.2 ── -->
+  <div id="page-asistencia" class="page">
+    <div class="page-header">
+      <h2>📅 Tasa de asistencia por sede <span class="badge badge-q2">Q2.2</span></h2>
+      <p>Total de reservas vs asistencias reales agrupadas por sede</p>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <canvas id="chartAsistenciaPage" height="280"></canvas>
+      </div>
+      <div class="panel">
+        <div id="tabla-asistencia"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INASISTENCIAS Q2.3 ── -->
+  <div id="page-inasistencias" class="page">
+    <div class="page-header">
+      <h2>⚠️ Top inasistencias injustificadas <span class="badge badge-q2">Q2.3</span></h2>
+      <p>5 estudiantes con mayor número de inasistencias sin justificación</p>
+    </div>
+    <div class="panel">
+      <div id="tabla-inasistencias"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ── PROYECCIÓN Q1.1 ── -->
+  <div id="page-proyeccion" class="page">
+    <div class="page-header">
+      <h2>📈 Proyección de demanda semanal <span class="badge badge-q1">Q1.1</span></h2>
+      <p>Promedio histórico por sede y día + buffer de seguridad del 8%</p>
+    </div>
+    <div class="panel">
+      <div id="tabla-proyeccion"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ── FINANCIERO Q1.2 ── -->
+  <div id="page-financiero" class="page">
+    <div class="page-header">
+      <h2>💰 Reporte financiero por sede <span class="badge badge-q1">Q1.2</span></h2>
+      <p>Costo producido, costo desperdiciado y ahorro proyectado con el 30% de reducción</p>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <canvas id="chartFinanciero" height="280"></canvas>
+      </div>
+      <div class="panel">
+        <div id="tabla-financiero"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIESGO Q1.3 ── -->
+  <div id="page-riesgo" class="page">
+    <div class="page-header">
+      <h2>🚨 Estudiantes con beneficio en riesgo <span class="badge badge-q1">Q1.3</span></h2>
+      <p>Tasa de inasistencia superior al 30% (mín. 3 reservas en el período)</p>
+    </div>
+    <div class="panel">
+      <div id="tabla-riesgo"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ── EFICIENCIA Q1.5 ── -->
+  <div id="page-eficiencia" class="page">
+    <div class="page-header">
+      <h2>🏆 Eficiencia de menús con recomendación <span class="badge badge-q1">Q1.5</span></h2>
+      <p>Score de eficiencia (porciones servidas / preparadas) + acción recomendada</p>
+    </div>
+    <div class="panel">
+      <div id="tabla-eficiencia"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+const API = 'http://localhost:3000/api';
+
+// ── Colores paleta ──────────────────────────────────────────
+const PALETTE = ['#1B4D3E','#2E7D5B','#C2622D','#8C6A3F','#4A7A6D','#6BA68A'];
+const DIAS = ['', 'Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+// ── Navegación ──────────────────────────────────────────────
+function goto(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  event.currentTarget.classList.add('active');
+  initPage(page);
+}
+
+// ── Toast ────────────────────────────────────────────────────
+function toast(msg, tipo = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + tipo;
+  setTimeout(() => t.className = '', 3500);
+}
+
+// ── Fetch helper ────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({ error: 'Error de red' }));
+    throw new Error(e.error || 'Error ' + r.status);
+  }
+  return r.json();
+}
+
+// ── Inicializar dashboard ───────────────────────────────────
+async function initDashboard() {
+  try {
+    const s = await api('/stats');
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="ico">👩‍🎓</div><div class="num">${s.estudiantes}</div><div class="lbl">Estudiantes activos</div></div>
+      <div class="stat-card"><div class="ico">📋</div><div class="num">${s.reservas_comida}</div><div class="lbl">Reservas de comida</div></div>
+      <div class="stat-card"><div class="ico">🥗</div><div class="num">${s.menus}</div><div class="lbl">Menús registrados</div></div>
+      <div class="stat-card"><div class="ico">✅</div><div class="num">${s.registros_asistencia}</div><div class="lbl">Registros de asistencia</div></div>
+      <div class="stat-card"><div class="ico">🌿</div><div class="num">${s.preferencias_alimenticias}</div><div class="lbl">Preferencias alimenticias</div></div>
+      <div class="stat-card total"><div class="ico">🗄️</div><div class="num">${s.total}</div><div class="lbl">Total documentos</div></div>
+    `;
+    // Charts del dashboard
+    const desp = await api('/reportes/desperdicio-dieta');
+    crearBarChart('chartDesperdicio', desp.map(d => d.tipo_dieta), desp.map(d => d.porcentaje_desperdicio), '% Desperdicio', PALETTE);
+
+    const asist = await api('/reportes/asistencia-sede');
+    crearBarChart('chartAsistencia', asist.map(d => d.sede.replace('Sede ', '')), asist.map(d => d.tasa_asistencia_pct), '% Asistencia', PALETTE);
+  } catch (e) { toast('Error cargando dashboard: ' + e.message, 'err'); }
+}
+
+// ── Chart helper ────────────────────────────────────────────
+const chartInstances = {};
+function crearBarChart(id, labels, data, label, colors) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  if (chartInstances[id]) chartInstances[id].destroy();
+  chartInstances[id] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data,
+        backgroundColor: colors.slice(0, data.length),
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } }
+      },
+      scales: {
+        y: { grid: { color: '#EEE' }, ticks: { color: '#6B7B73', font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: '#3B3B3B', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ── Tabla de menús ───────────────────────────────────────────
+async function cargarMenus() {
+  try {
+    const data = await api('/menus');
+    document.getElementById('tabla-menus').innerHTML = tablaMenus(data);
+  } catch (e) { toast(e.message, 'err'); }
+}
+function tablaMenus(data) {
+  if (!data.length) return '<p style="color:#999;padding:16px">No hay menús registrados aún.</p>';
+  return `<div class="tabla-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Sede</th><th>Proteína</th><th>Tipo Dieta</th><th>Calorías</th><th>Costo</th><th>Desperdicio kg</th></tr></thead>
+    <tbody>${data.map(m => `<tr>
+      <td>${m.fecha ? new Date(m.fecha).toLocaleDateString('es-CO') : '—'}</td>
+      <td>${m.sede || '—'}</td>
+      <td>${m.proteina || '—'}</td>
+      <td>${Array.isArray(m.tipo_dieta) ? m.tipo_dieta.map(t => `<span class="chip chip-verde">${t}</span>`).join(' ') : (m.tipo_dieta || '—')}</td>
+      <td>${m.calorias || '—'} kcal</td>
+      <td>$${(m.costo_unitario || 0).toLocaleString('es-CO')}</td>
+      <td>${m.desperdicio_kg !== undefined ? m.desperdicio_kg + ' kg' : '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ── Estudiantes ──────────────────────────────────────────────
+async function cargarEstudiantes() {
+  const sede = document.getElementById('sede-filtro').value;
+  try {
+    const data = await api('/estudiantes' + (sede ? '?sede=' + encodeURIComponent(sede) : ''));
+    const el = document.getElementById('tabla-estudiantes');
+    if (!data.length) { el.innerHTML = '<p style="color:#999;padding:16px">No se encontraron estudiantes.</p>'; return; }
+    el.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Código</th><th>Nombre</th><th>Sede</th><th>Semestre</th></tr></thead>
+      <tbody>${data.map(e => `<tr><td><code>${e.codigo}</code></td><td>${e.nombre} ${e.apellido}</td><td><span class="chip chip-verde">${e.sede}</span></td><td>${e.semestre}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Crear reserva ────────────────────────────────────────────
+async function crearReserva() {
+  const body = {
+    codigo_estudiante: document.getElementById('res-codigo').value.trim(),
+    sede: document.getElementById('res-sede').value,
+    fecha_almuerzo: document.getElementById('res-fecha').value,
+    hora_preferida: document.getElementById('res-hora').value
+  };
+  if (!body.codigo_estudiante || !body.sede || !body.fecha_almuerzo) {
+    toast('Completa todos los campos obligatorios', 'err'); return;
+  }
+  try {
+    const r = await api('/reservas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    document.getElementById('resultado-reserva').innerHTML =
+      `<div style="background:var(--verde-suave);padding:12px 14px;border-radius:8px;color:var(--verde)">
+        <strong>✅ Reserva creada</strong><br>ID: <code>${r.id}</code><br>
+        Sede: ${r.reserva.sede} — Fecha: ${new Date(r.reserva.fecha_almuerzo).toLocaleDateString('es-CO')}
+      </div>`;
+    toast('Reserva creada exitosamente', 'ok');
+  } catch (e) {
+    document.getElementById('resultado-reserva').innerHTML =
+      `<div style="background:#FCE4EC;padding:12px 14px;border-radius:8px;color:#B00020">❌ ${e.message}</div>`;
+    toast(e.message, 'err');
+  }
+}
+
+// ── Limpiar canceladas ───────────────────────────────────────
+async function limpiarCanceladas() {
+  try {
+    const r = await api('/reservas/canceladas', { method: 'DELETE' });
+    document.getElementById('resultado-limpieza').innerHTML =
+      `<div style="background:var(--verde-suave);padding:12px 14px;border-radius:8px;color:var(--verde)">${r.mensaje}</div>`;
+    toast(r.mensaje, 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Desperdicio Q2.1 ─────────────────────────────────────────
+async function cargarDesperdicio() {
+  try {
+    const data = await api('/reportes/desperdicio-dieta');
+    crearBarChart('chartDesperdicioPage', data.map(d => d.tipo_dieta), data.map(d => d.porcentaje_desperdicio), '% Desperdicio', PALETTE);
+    document.getElementById('tabla-desperdicio').innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Tipo Dieta</th><th>Preparadas</th><th>Servidas</th><th>Desperdicio (kg)</th><th>% Desperdicio</th></tr></thead>
+      <tbody>${data.map(d => {
+        const pct = d.porcentaje_desperdicio || 0;
+        const chip = pct > 15 ? 'chip-rojo' : pct > 10 ? 'chip-naranja' : 'chip-verde';
+        return `<tr>
+          <td><strong>${d.tipo_dieta}</strong></td>
+          <td>${d.total_preparadas}</td>
+          <td>${d.total_servidas}</td>
+          <td>${(d.total_desperdicio_kg || 0).toFixed(1)} kg</td>
+          <td><span class="chip ${chip}">${pct}%</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Asistencia Q2.2 ──────────────────────────────────────────
+async function cargarAsistencia() {
+  try {
+    const data = await api('/reportes/asistencia-sede');
+    crearBarChart('chartAsistenciaPage', data.map(d => d.sede.replace('Sede ', '')), data.map(d => d.tasa_asistencia_pct), '% Asistencia', PALETTE);
+    document.getElementById('tabla-asistencia').innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Sede</th><th>Reservas</th><th>Asistieron</th><th>Tasa</th></tr></thead>
+      <tbody>${data.map(d => `<tr>
+        <td>${d.sede}</td><td>${d.total_reservas}</td><td>${d.total_asistio}</td>
+        <td><span class="chip ${d.tasa_asistencia_pct >= 70 ? 'chip-verde' : 'chip-naranja'}">${d.tasa_asistencia_pct}%</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Inasistencias Q2.3 ───────────────────────────────────────
+async function cargarInasistencias() {
+  try {
+    const data = await api('/reportes/top-inasistencias');
+    const el = document.getElementById('tabla-inasistencias');
+    if (!data.length) { el.innerHTML = '<p style="padding:16px;color:#999">No hay inasistencias injustificadas registradas.</p>'; return; }
+    el.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Pos.</th><th>Código</th><th>Nombre</th><th>Sede</th><th>Inasistencias injustificadas</th></tr></thead>
+      <tbody>${data.map((d, i) => `<tr>
+        <td>${['🥇','🥈','🥉','4°','5°'][i]}</td>
+        <td><code>${d.codigo}</code></td>
+        <td>${d.nombre} ${d.apellido}</td>
+        <td><span class="chip chip-azul">${d.sede}</span></td>
+        <td><span class="chip chip-rojo">${d.total_inasistencias}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Proyección Q1.1 ──────────────────────────────────────────
+async function cargarProyeccion() {
+  try {
+    const data = await api('/reportes/proyeccion-demanda');
+    const el = document.getElementById('tabla-proyeccion');
+    if (!data.length) { el.innerHTML = '<p style="padding:16px;color:#999">No hay suficientes datos históricos aún para generar proyección.</p>'; return; }
+    el.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Sede</th><th>Día</th><th>Prom. histórico</th><th>Proyección (+8%)</th><th>Confiabilidad</th></tr></thead>
+      <tbody>${data.map(d => `<tr>
+        <td>${d.sede}</td>
+        <td>${DIAS[d.dia_semana] || d.dia_semana}</td>
+        <td>${d.promedio_historico} porciones</td>
+        <td><strong>${d.proyeccion_recomendada} porciones</strong></td>
+        <td><span class="chip ${d.confiabilidad==='Alta'?'chip-verde':d.confiabilidad==='Media'?'chip-azul':'chip-naranja'}">${d.confiabilidad}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Financiero Q1.2 ──────────────────────────────────────────
+async function cargarFinanciero() {
+  try {
+    const data = await api('/reportes/financiero');
+    // Gráfica de desperdicio en COP
+    const ctx = document.getElementById('chartFinanciero');
+    if (ctx && data.length) {
+      if (chartInstances['chartFinanciero']) chartInstances['chartFinanciero'].destroy();
+      chartInstances['chartFinanciero'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.sede.replace('Sede ', '')),
+          datasets: [
+            { label: 'Costo total ($)', data: data.map(d => d.costo_total_producido), backgroundColor: '#2E7D5B', borderRadius: 5 },
+            { label: 'Costo desperdicio ($)', data: data.map(d => d.costo_desperdicio_cop), backgroundColor: '#C2622D', borderRadius: 5 }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: c => `$${c.parsed.y.toLocaleString('es-CO')}` } }
+          },
+          scales: {
+            y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k', color: '#6B7B73', font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: '#3B3B3B', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+    const ef = document.getElementById('tabla-financiero');
+    if (!data.length) { ef.innerHTML = '<p style="padding:16px;color:#999">Sin datos financieros.</p>'; return; }
+    ef.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Sede</th><th>Eficiencia</th><th>Costo desperdicio</th><th>Ahorro 30%</th></tr></thead>
+      <tbody>${data.map(d => `<tr>
+        <td>${d.sede}</td>
+        <td><span class="chip ${d.porcentaje_eficiencia >= 85 ? 'chip-verde' : d.porcentaje_eficiencia >= 70 ? 'chip-azul' : 'chip-naranja'}">${d.porcentaje_eficiencia}%</span></td>
+        <td>$${(d.costo_desperdicio_cop || 0).toLocaleString('es-CO')}</td>
+        <td style="color:var(--verde-med);font-weight:700">$${(d.ahorro_proyectado_30pct || 0).toLocaleString('es-CO')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Riesgo Q1.3 ──────────────────────────────────────────────
+async function cargarRiesgo() {
+  try {
+    const data = await api('/reportes/estudiantes-riesgo');
+    const el = document.getElementById('tabla-riesgo');
+    if (!data.length) { el.innerHTML = '<p style="padding:16px;color:var(--verde-med)">✅ No hay estudiantes en riesgo actualmente.</p>'; return; }
+    el.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Código</th><th>Nombre</th><th>Sede</th><th>Tasa inasistencia</th><th>Alerta</th></tr></thead>
+      <tbody>${data.map(d => `<tr>
+        <td><code>${d.codigo}</code></td>
+        <td>${d.nombre} ${d.apellido}</td>
+        <td><span class="chip chip-azul">${d.sede}</span></td>
+        <td><span class="chip chip-rojo">${d.tasa_inasistencia}%</span></td>
+        <td>${d.riesgo}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Eficiencia Q1.5 ──────────────────────────────────────────
+async function cargarEficiencia() {
+  try {
+    const data = await api('/reportes/eficiencia-menus');
+    const el = document.getElementById('tabla-eficiencia');
+    if (!data.length) { el.innerHTML = '<p style="padding:16px;color:#999">Sin datos de menús.</p>'; return; }
+    el.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Sede</th><th>Proteína</th><th>Preparadas</th><th>Servidas</th><th>Eficiencia</th><th>Recomendación</th></tr></thead>
+      <tbody>${data.map(d => {
+        const pct = d.eficiencia_pct || 0;
+        const color = pct >= 90 ? '#2E7D5B' : pct >= 75 ? '#4A7A6D' : pct >= 60 ? '#C2622D' : '#D32F2F';
+        return `<tr>
+          <td>${d.sede || '—'}</td>
+          <td>${d.proteina || '—'}</td>
+          <td>${d.porciones_preparadas}</td>
+          <td>${d.porciones_servidas}</td>
+          <td>
+            <div class="barra-wrap">
+              <div class="barra"><div class="barra-fill" style="width:${pct}%;background:${color}"></div></div>
+              <span class="barra-val" style="color:${color}">${pct}%</span>
+            </div>
+          </td>
+          <td style="font-size:12px;color:${color}">${d.recomendacion}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ── Dispatcher ───────────────────────────────────────────────
+const pageLoaders = {
+  dashboard:    initDashboard,
+  menus:        cargarMenus,
+  estudiantes:  cargarEstudiantes,
+  desperdicio:  cargarDesperdicio,
+  asistencia:   cargarAsistencia,
+  inasistencias:cargarInasistencias,
+  proyeccion:   cargarProyeccion,
+  financiero:   cargarFinanciero,
+  riesgo:       cargarRiesgo,
+  eficiencia:   cargarEficiencia
+};
+function initPage(page) {
+  if (pageLoaders[page]) pageLoaders[page]();
+}
+
+// ── Auto-start ───────────────────────────────────────────────
+initDashboard();
+</script>
+</body>
+</html>
